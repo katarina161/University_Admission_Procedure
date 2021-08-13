@@ -1,4 +1,4 @@
-import csv
+import os
 from sys import stderr
 
 
@@ -39,6 +39,16 @@ def get_applicant_with_scores(fpath):
         return applicants
 
 
+def write_to_file(department):
+    fpath = f"{department.name.lower()}.txt"
+    try:
+        with open(fpath, "w") as fobj:
+            for s in department.students:
+                fobj.write(f"{s.first_name} {s.last_name} {s.mean_score}\n")
+    except os.error as err:
+        stderr.write(f"An error occurred while trying to write to file {fpath}:\n{err}\n")
+
+
 class Department:
     def __init__(self, name, places=0, exam=None):
         self.name = name
@@ -48,21 +58,21 @@ class Department:
 
     def enroll_students(self, students):
         self.students.extend(students)
-        self.students.sort(key=lambda x: (-x.scores[self.exam], (x.first_name + x.last_name)))
+        self.students.sort(key=lambda x: (-x.mean_score, (x.first_name + x.last_name)))
         self.places -= len(students)
 
     def __str__(self):
         dep_str = self.name + "\n"
-        dep_str += "\n".join([f"{a.first_name} {a.last_name} {a.scores[self.exam]}" for a in self.students])
+        dep_str += "\n".join([f"{a.first_name} {a.last_name} {a.mean_score}" for a in self.students])
         return dep_str + "\n"
 
 
 class University:
-    departments = {"Biotech": Department("Biotech", exam="chemistry"),
-                   "Chemistry": Department("Chemistry", exam="chemistry"),
-                   "Engineering": Department("Engineering", exam="computer_science"),
-                   "Mathematics": Department("Mathematics", exam="math"),
-                   "Physics": Department("Physics", exam="physics")}
+    departments = {"Biotech": Department("Biotech", exam=["chemistry", "physics"]),
+                   "Chemistry": Department("Chemistry", exam=["chemistry"]),
+                   "Engineering": Department("Engineering", exam=["computer_science", "math"]),
+                   "Mathematics": Department("Mathematics", exam=["math"]),
+                   "Physics": Department("Physics", exam=["physics", "math"])}
 
     def __init__(self):
         self.applicants = []
@@ -74,10 +84,14 @@ class University:
     def get_applicants_per_department(self, start=0):
         applicants_per_department = {key: [] for key in self.departments}
         for applicant in self.applicants:
-            applicants_per_department[applicant.choices[start]].append(applicant)
+            department = self.departments[applicant.choices[start]]
+            scores = [applicant.scores[exam] for exam in department.exam]
+            applicant.mean_score = round(sum(scores) / len(scores), 1)
+
+            applicants_per_department[department.name].append(applicant)
 
         for key, val in applicants_per_department.items():
-            val.sort(key=lambda x: (-x.scores[self.departments[key].exam], (x.first_name + x.last_name)))
+            val.sort(key=lambda x: (-x.mean_score, (x.first_name + x.last_name)))
 
         return dict(sorted(applicants_per_department.items()))
 
@@ -95,6 +109,10 @@ class University:
                 self.remove_applicants(students)
             i += 1
 
+    def save_data(self):
+        for department in self.departments.values():
+            write_to_file(department)
+
     def __str__(self):
         u_str = "University:\n"
         u_str += '\n'.join([str(a) for a in self.applicants])
@@ -109,6 +127,7 @@ class Applicant:
         self.gpa = gpa
         self.choices = choices
         self.scores = scores
+        self.mean_score = None
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} {self.scores} {self.choices}"
@@ -136,8 +155,9 @@ def main():
     #     print(key, *val, sep="\n")
     #     print()
     university.enroll_applicants()
-    for department in university.departments.values():
-        print(department)
+    # for department in university.departments.values():
+    #     print(department)
+    university.save_data()
 
 
 if __name__ == "__main__":
