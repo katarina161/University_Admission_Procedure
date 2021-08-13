@@ -1,3 +1,4 @@
+import csv
 from sys import stderr
 
 
@@ -17,30 +18,53 @@ def get_applicants(fpath):
         return applicants
 
 
+def get_applicant_with_scores(fpath):
+    applicants = []
+    exams = ["physics", "chemistry", "math", "computer_science"]
+
+    try:
+        with open(fpath, 'r') as fobj:
+            for line in [l.strip() for l in fobj]:
+                applicant_data = line.split()
+                name = applicant_data[0]
+                last_name = applicant_data[1]
+                scores = dict(zip(exams, [float(score) for score in applicant_data[2:6]]))
+                choices = applicant_data[6:]
+                applicants.append(Applicant(name, last_name, scores=scores, choices=choices))
+    except FileNotFoundError:
+        stderr.write(f"Error! File {fpath} does not exist. Cannot proceed.\n")
+    except OSError as err:
+        stderr.write(f"An error occurred while reading from file {fpath}:\n{err}\n")
+    else:
+        return applicants
+
+
 class Department:
-    def __init__(self, name, places=0):
+    def __init__(self, name, places=0, exam=None):
         self.name = name
         self.places = places
         self.students = []
+        self.exam = exam
 
     def enroll_students(self, students):
         self.students.extend(students)
-        self.students.sort(reverse=True)
+        self.students.sort(key=lambda x: (-x.scores[self.exam], (x.first_name + x.last_name)))
         self.places -= len(students)
 
     def __str__(self):
         dep_str = self.name + "\n"
-        dep_str += "\n".join([str(a) for a in self.students])
+        dep_str += "\n".join([f"{a.first_name} {a.last_name} {a.scores[self.exam]}" for a in self.students])
         return dep_str + "\n"
 
 
 class University:
+    departments = {"Biotech": Department("Biotech", exam="chemistry"),
+                   "Chemistry": Department("Chemistry", exam="chemistry"),
+                   "Engineering": Department("Engineering", exam="computer_science"),
+                   "Mathematics": Department("Mathematics", exam="math"),
+                   "Physics": Department("Physics", exam="physics")}
+
     def __init__(self):
-        self.departments = {"Biotech": Department("Biotech"),
-                            "Chemistry": Department("Chemistry"),
-                            "Engineering": Department("Engineering"),
-                            "Mathematics": Department("Mathematics"),
-                            "Physics": Department("Physics")}
         self.applicants = []
 
     def set_empty_places(self, places):
@@ -53,7 +77,7 @@ class University:
             applicants_per_department[applicant.choices[start]].append(applicant)
 
         for key, val in applicants_per_department.items():
-            val.sort(reverse=True)
+            val.sort(key=lambda x: (-x.scores[self.departments[key].exam], (x.first_name + x.last_name)))
 
         return dict(sorted(applicants_per_department.items()))
 
@@ -79,14 +103,15 @@ class University:
 
 class Applicant:
 
-    def __init__(self, first_name, last_name, gpa, choices):
+    def __init__(self, first_name, last_name, gpa=None, choices=None, scores: dict = None):
         self.first_name = first_name
         self.last_name = last_name
         self.gpa = gpa
         self.choices = choices
+        self.scores = scores
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name} {self.gpa}"
+        return f"{self.first_name} {self.last_name} {self.scores} {self.choices}"
 
     def __eq__(self, other):
         return self.first_name == other.first_name and\
@@ -103,7 +128,8 @@ def main():
     empty_places = int(input())
     university = University()
     university.set_empty_places(empty_places)
-    university.applicants = get_applicants("applicant_list.txt")
+    university.applicants = get_applicant_with_scores("applicant_list_scores.txt")
+    # university.applicants = get_applicants("applicant_list.txt")
     # print(university)
     # print()
     # for key, val in university.get_applicants_per_department().items():
