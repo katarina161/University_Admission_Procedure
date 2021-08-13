@@ -29,8 +29,13 @@ def get_applicant_with_scores(fpath):
                 name = applicant_data[0]
                 last_name = applicant_data[1]
                 scores = dict(zip(exams, [float(score) for score in applicant_data[2:6]]))
-                choices = applicant_data[6:]
-                applicants.append(Applicant(name, last_name, scores=scores, choices=choices))
+                special_exam = float(applicant_data[6])
+                choices = applicant_data[7:]
+                applicants.append(Applicant(name,
+                                            last_name,
+                                            scores=scores,
+                                            choices=choices,
+                                            special_exam=special_exam))
     except FileNotFoundError:
         stderr.write(f"Error! File {fpath} does not exist. Cannot proceed.\n")
     except OSError as err:
@@ -44,7 +49,7 @@ def write_to_file(department):
     try:
         with open(fpath, "w") as fobj:
             for s in department.students:
-                fobj.write(f"{s.first_name} {s.last_name} {s.mean_score}\n")
+                fobj.write(f"{s.first_name} {s.last_name} {max(s.mean_score, s.special_exam)}\n")
     except os.error as err:
         stderr.write(f"An error occurred while trying to write to file {fpath}:\n{err}\n")
 
@@ -58,7 +63,7 @@ class Department:
 
     def enroll_students(self, students):
         self.students.extend(students)
-        self.students.sort(key=lambda x: (-x.mean_score, (x.first_name + x.last_name)))
+        self.students.sort(key=lambda x: (-max(x.mean_score, x.special_exam), (x.first_name + x.last_name)))
         self.places -= len(students)
 
     def __str__(self):
@@ -91,7 +96,7 @@ class University:
             applicants_per_department[department.name].append(applicant)
 
         for key, val in applicants_per_department.items():
-            val.sort(key=lambda x: (-x.mean_score, (x.first_name + x.last_name)))
+            val.sort(key=lambda x: (-max(x.mean_score, x.special_exam), (x.first_name + x.last_name)))
 
         return dict(sorted(applicants_per_department.items()))
 
@@ -121,13 +126,14 @@ class University:
 
 class Applicant:
 
-    def __init__(self, first_name, last_name, gpa=None, choices=None, scores: dict = None):
+    def __init__(self, first_name, last_name, gpa=None, choices=None, scores: dict = None, special_exam=None):
         self.first_name = first_name
         self.last_name = last_name
         self.gpa = gpa
         self.choices = choices
         self.scores = scores
         self.mean_score = None
+        self.special_exam = special_exam
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} {self.scores} {self.choices}"
@@ -147,7 +153,7 @@ def main():
     empty_places = int(input())
     university = University()
     university.set_empty_places(empty_places)
-    university.applicants = get_applicant_with_scores("applicant_list_scores.txt")
+    university.applicants = get_applicant_with_scores("applicant_list_special_exam.txt")
     # university.applicants = get_applicants("applicant_list.txt")
     # print(university)
     # print()
